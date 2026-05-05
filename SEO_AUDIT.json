@@ -1,0 +1,281 @@
+{
+  "name": "SEO_AUDIT",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "seo-audit",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -304,
+        48
+      ],
+      "id": "a94648a3-611a-4e4f-bca1-169bbaf6097f",
+      "name": "Webhook",
+      "webhookId": "d3346b4a-d8b2-43ee-b5c9-6ae04244e6cd"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.query.url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -160,
+        -112
+      ],
+      "id": "f2c33f79-2ea6-4427-8c83-2ce3b8fe7f96",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $input.first().json.data\n\nif (!html) throw new Error(\"No HTML\");\n\n// Title\nconst title = (html.match(/<title[^>]*>(.*?)<\\/title>/i) || [])[1] || \"Missing\";\n\n// Meta\nconst meta = (html.match(/<meta[^>]*name=[\"']description[\"'][^>]*content=[\"'](.*?)[\"']/i) || [])[1] || \"Missing\";\n\n// H1\nconst h1Count = (html.match(/<h1\\b[^>]*>/gi) || []).length;\n\n// H2\nconst h2Count = (html.match(/<h2\\b[^>]*>/gi) || []).length;\n\n// Images\nconst imgTags = html.match(/<img\\b[^>]*>/gi) || [];\nlet missingAlt = imgTags.filter(img => !/alt\\s*=/i.test(img)).length;\n\n// Links\nconst linkTags = html.match(/<a\\b[^>]*href=[\"'](.*?)[\"']/gi) || [];\nlet internalLinks = linkTags.filter(l => l.includes(\"/\")).length;\n\n// Text\nconst cleanText = html.replace(/<[^>]*>/g, \" \");\nconst wordCount = cleanText.trim().split(/\\s+/).length;\n\n// Score\nlet score = 100;\nlet issues = [];\n\nif (!title || title === \"Missing\") { score -= 15; issues.push(\"Missing title\"); }\nif (!meta || meta === \"Missing\") { score -= 15; issues.push(\"Missing meta\"); }\nif (h1Count === 0) { score -= 15; issues.push(\"No H1\"); }\nif (missingAlt > 0) { score -= 10; issues.push(\"Missing alt tags\"); }\nif (wordCount < 300) { score -= 10; issues.push(\"Low content\"); }\n\nreturn [{\n  url: $('Webhook').first().json.query.url,\n  title,\n  meta,\n  h1Count,\n  h2Count,\n  internalLinks,\n  missingAlt,\n  wordCount,\n  seo_score: score,\n  issues: issues.join(\", \")\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        80
+      ],
+      "id": "c7796ead-d327-40f6-a3d9-488179d8e011",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        528,
+        -64
+      ],
+      "id": "a22b2ea5-08c3-4e18-891e-5865b7179447",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Act as an SEO expert.\n\nAnalyze this website:\n\nURL: {{$json.url}}\n\nSEO Data:\nTitle: {{$json.title}}\nScore: {{$json.seo_score}}\nIssues: {{$json.issues}}\nWord Count: \n\nGive:\n1. Short explanation of SEO quality\n2. Key improvements\n3. Final suggestion\n\nKeep it simple and professional."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        96,
+        -144
+      ],
+      "id": "c07f7a4a-1f66-48c8-b05d-332fb61e3041",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1qT53gInWdrWaJLb9YujF7IJRdMMw8K0NB_FbzXfhycU",
+          "mode": "list",
+          "cachedResultName": "seo audit",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1qT53gInWdrWaJLb9YujF7IJRdMMw8K0NB_FbzXfhycU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1qT53gInWdrWaJLb9YujF7IJRdMMw8K0NB_FbzXfhycU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "AI_report": "={{ $json.output[0].content[0].text }}",
+            "URL": "={{ $('Code in JavaScript').item.json.url }}",
+            "Score": "={{ $('Code in JavaScript').item.json.seo_score }}",
+            "Title": "={{ $('Code in JavaScript').item.json.title }}",
+            "Issues": "={{ $('Code in JavaScript').item.json.issues }}",
+            "Internal Links": "={{ $('Code in JavaScript').item.json.internalLinks }}",
+            "Word Count": "={{ $('Code in JavaScript').item.json.wordCount }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "URL",
+              "displayName": "URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Score",
+              "displayName": "Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Issues",
+              "displayName": "Issues",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Word Count",
+              "displayName": "Word Count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Internal Links",
+              "displayName": "Internal Links",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AI_report",
+              "displayName": "AI_report",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        336,
+        112
+      ],
+      "id": "8e5057da-5171-4b32-b8df-d0fca2c9125d",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "VJM62HEZqmsCfunD",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "047863a8-72e9-4bca-b539-8e90b3667cd5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7444f0900f1810774afec044660424a804333ffd23d02b0015e6678730fc4f48"
+  },
+  "id": "S6khrxqI3wwfvXLU",
+  "tags": []
+}
